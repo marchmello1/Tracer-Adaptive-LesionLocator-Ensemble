@@ -166,8 +166,9 @@ reviewed independently.
 ## Paper and citation
 
 The method-description source and compiled manuscript are in [`paper/`](paper/).
-Citation metadata is available in [`CITATION.cff`](CITATION.cff). A public
-preprint identifier should be added to both after publication.
+The reviewed PDF and reproducible source package are published in the
+[`preprint-v1.0.0` release](https://github.com/marchmello1/Autopet-v-topology-safe-adaptive/releases/tag/preprint-v1.0.0).
+Citation metadata is available in [`CITATION.cff`](CITATION.cff).
 
 ## License
 
