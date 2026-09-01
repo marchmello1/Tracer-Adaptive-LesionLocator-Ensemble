@@ -76,6 +76,23 @@ a0cb3a89c72b0a79a27900980361385ff02572c0c71aba6609390fecbbc13e82
 No network access is used during inference. In the submitted deployment the
 weights are mounted read-only at `/opt/ml/model` by Grand Challenge.
 
+## GitHub authentication for maintainers
+
+Never place a personal access token in this repository, a commit, a command-line
+argument, or an issue. Use a fine-grained token restricted to this repository
+with `Contents: Read and write` and `Metadata: Read-only`. Enter it without
+echoing it and keep it only in the current shell:
+
+```bash
+read -rsp 'GitHub token: ' GH_TOKEN
+export GH_TOKEN
+printf '\n'
+gh auth status
+```
+
+Revoke and replace any token disclosed in chat, logs, screenshots, or shell
+history before using it.
+
 ## Model checkpoints
 
 | Component | Source | Integrity check |

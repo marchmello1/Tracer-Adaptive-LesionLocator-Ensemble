@@ -3,7 +3,10 @@ message: "If you use this software, please cite the AutoPET V method preprint an
 title: "Topology-Safe Adaptive PET/CT Lesion Fusion"
 type: software
 authors:
-  - name: "Marchmello01"
+  - family-names: "Agwan"
+    given-names: "Mohammad"
+    affiliation: "Nuvo AI"
+    email: "mohammad.agwan@nuvo.ai"
 repository-code: "https://github.com/Marchmello01/autopet-v-topology-safe-adaptive"
 license: Apache-2.0
 version: 1.0.0

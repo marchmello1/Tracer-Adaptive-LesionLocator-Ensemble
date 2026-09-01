@@ -5,10 +5,11 @@
 \newcolumntype{P}[1]{>{\raggedright\arraybackslash}p{#1}}
 
 \begin{document}
-\title{Marchmello01: Topology-Safe Adaptive Lesion Fusion for Interactive PET/CT Segmentation}
-\author{Marchmello01}
-\authorrunning{Marchmello01}
-\institute{Independent researcher}
+\title{Topology-Safe Adaptive Lesion Fusion for Interactive PET/CT Segmentation}
+\titlerunning{Topology-Safe Adaptive Lesion Fusion}
+\author{Mohammad Agwan}
+\authorrunning{M. Agwan}
+\institute{Nuvo AI\\mohammad.agwan@nuvo.ai}
 \maketitle
 
 \begin{abstract}
@@ -92,7 +93,8 @@ All network weights are unchanged pretrained weights. Consequently, no new
 optimizer, schedule, augmentation, or training hardware is applicable to this
 derivative. Inference uses five initial-model folds, one interactive fold,
 disabled mirror TTA, binary connected components, and cumulative stateless
-scribble replay. The submitted image targets an NVIDIA T4 with 16~GB VRAM.
+scribble replay. Engineering and local validation used up to six NVIDIA H100
+80~GB HBM3 GPUs. The submitted image targets an NVIDIA T4 with 16~GB VRAM.
 
 \subsection{GitHub repository}
 Code, tests, build recipes, notices, and checkpoint integrity hashes are
@@ -123,29 +125,23 @@ does not establish final-set performance.
 \begin{table}[ht]
 \caption{Algorithm details.}\label{tab1}
 \small
-\begin{tabular}{P{0.18\textwidth}P{0.18\textwidth}P{0.18\textwidth}P{0.18\textwidth}P{0.18\textwidth}}
+\centering
+\setlength{\tabcolsep}{6pt}
+\begin{tabular}{P{0.27\textwidth}P{0.64\textwidth}}
 \toprule
-Team & Algorithm & Preprocessing & Postprocessing & Augmentation \\
+Item & Configuration \\
 \midrule
-Marchmello01 & Tracer Adaptive LesionLocator Ensemble & nnU-Net PET/CT normalization and resampling & Tracer calibration; topology-safe component fusion & Upstream pretrained models; no new training \\
-\bottomrule
-\end{tabular}
-
-\vspace{1em}
-\begin{tabular}{P{0.18\textwidth}P{0.18\textwidth}P{0.18\textwidth}P{0.18\textwidth}P{0.18\textwidth}}
-\toprule
-TTA & Ensembling & Framework & Architecture & Training loss \\
-\midrule
-None & Five-fold K0; one interactive fold; three-model tracer vote & nnU-Net v2 / PyTorch & 3-D residual-encoder U-Nets & Unchanged upstream Dice and cross-entropy objectives \\
-\bottomrule
-\end{tabular}
-
-\vspace{1em}
-\begin{tabular}{P{0.23\textwidth}P{0.23\textwidth}P{0.23\textwidth}P{0.23\textwidth}}
-\toprule
-Training data & Dimensionality & Pretrained models & Hardware \\
-\midrule
-Public AutoPET FDG/PSMA cohorts; no new training & 3-D whole-body PET/CT with sliding-window inference & Public AutoPET-III initializer and AutoPET-IV interaction model & NVIDIA T4 16~GB inference target \\
+Team & Nuvo AI \\
+Algorithm & Tracer Adaptive LesionLocator Ensemble \\
+Input and preprocessing & 3-D whole-body PET/CT; nnU-Net normalization, resampling, and sliding-window inference \\
+Initial segmentation & Five-fold residual-encoder U-Net ensemble with a three-model tracer vote \\
+Interaction model & One prompt-conditioned EDT fold with cumulative stateless scribble replay \\
+Postprocessing & Tracer calibration, component filtering, and topology-safe component fusion \\
+Training and augmentation & Public pretrained models; no new training or augmentation \\
+Test-time augmentation & None \\
+Framework & nnU-Net v2 and PyTorch \\
+Development hardware & Up to six NVIDIA H100 80~GB HBM3 GPUs \\
+Inference hardware & NVIDIA T4, 16~GB VRAM \\
 \bottomrule
 \end{tabular}
 \end{table}
