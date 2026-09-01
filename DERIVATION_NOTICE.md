@@ -4,7 +4,7 @@ This deployment composes Apache-2.0 AutoPET-III LesionTracer and AutoPET-IV
 LesionLocator components with submission-specific routing and topology-safe
 interaction logic.
 
-Changes made for the Marchmello01 topology-safe adaptive submission:
+Changes made for the marchmello1 topology-safe adaptive submission:
 
 - resolve the unchanged AutoPET-III and EDT weights from Grand Challenge's
   separately mounted `/opt/ml/model` directory;
