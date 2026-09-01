@@ -6,23 +6,25 @@ fixtures are local validation cases, not the hidden preliminary test set, so
 the results demonstrate the direction of the changes rather than an expected
 official score.
 
-| Case | Upstream Dice AUC | Final Dice AUC | Upstream F1 AUC | Final F1 AUC |
+| Case | v2 Dice AUC | v3 Dice AUC | v2 F1 AUC | v3 F1 AUC |
 | --- | ---: | ---: | ---: | ---: |
-| FDG 1 | 0.859062 | 0.859062 | 0.750000 | 0.750000 |
+| FDG 1 | 0.859062 | 0.859103 | 0.750000 | 0.750000 |
 | FDG 2 | 0.854681 | 0.854681 | 1.000000 | 1.000000 |
 | FDG 3 (negative) | n/a | n/a | n/a | n/a |
 | FDG 4 | 0.865234 | 0.865234 | 1.000000 | 1.000000 |
-| PSMA 1 | 0.800595 | 0.801071 | 0.887139 | 0.887139 |
-| PSMA 2 | 0.827766 | 0.834320 | 0.929577 | 0.950188 |
-| PSMA 3 | 0.793657 | 0.793657 | 1.000000 | 1.000000 |
-| PSMA 4 | 0.848048 | 0.848048 | 0.861111 | 0.861111 |
-| Mean over 7 defined cases | 0.835578 | 0.836582 | 0.918261 | 0.921205 |
+| PSMA 1 | 0.801071 | 0.801398 | 0.887139 | 0.889764 |
+| PSMA 2 | 0.834320 | 0.836070 | 0.950188 | 0.950188 |
+| PSMA 3 | 0.793657 | 0.823770 | 1.000000 | 1.000000 |
+| PSMA 4 | 0.848048 | 0.851511 | 0.861111 | 0.861111 |
+| Mean over 7 defined cases | 0.836582 | 0.841681 | 0.921205 | 0.921580 |
 
-The candidate therefore changed the local mean by +0.001004 Dice AUC and
-+0.002944 F1 AUC. The PSMA 2 improvement came from recovering additional true
-lesion instances without adding false-positive instances. The 128-component
-ceiling kept the highly fragmented PSMA 1 scan on the conservative upstream
-foreground path; only its topology-safe certified-background operation fired.
+Relative to the frozen preliminary v2 image, v3 changed the local mean by
++0.005099 Dice AUC and +0.000375 F1 AUC. Four cases improved in Dice and three
+were unchanged; one case improved in F1 and six were unchanged. No defined case
+regressed. V3 adds only exact foreground-scribble voxels, without dilation, and
+rejects a connected scribble stroke if it would merge accepted lesions. These
+fixtures support a causal engineering comparison but remain too small to
+estimate hidden final-test performance.
 
 Regression coverage includes independent donor-component topology validation,
 rejection of bridges between existing lesions, safe acceptance of a separate

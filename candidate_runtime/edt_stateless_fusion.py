@@ -37,6 +37,7 @@ def fuse_clicked_components(
     *,
     disable_background_edits: bool = False,
     certified_background_points: bool = False,
+    certified_tumor_points: bool = False,
     psma_max_components: int = 128,
 ) -> np.ndarray:
     """Fuse cumulative clicks into k0 without relying on previous container state."""
@@ -120,6 +121,27 @@ def fuse_clicked_components(
             candidate[target] = False
             candidate_count = _component_count(candidate)
             if candidate_count <= current_count:
+                fused = candidate
+                current_count = candidate_count
+
+    if certified_tumor_points and len(tumor) > 0:
+        # Foreground scribble voxels are direct supervision. Enforce only the
+        # marked voxels, one connected stroke at a time, and reject a stroke
+        # if it would bridge accepted lesion components.
+        scribble_mask = np.zeros_like(fused, dtype=np.uint8)
+        index = tuple(tumor[:, axis] for axis in range(3))
+        scribble_mask[index] = 1
+        stroke_labels, stroke_count = cc3d.connected_components(
+            scribble_mask, connectivity=18, return_N=True
+        )
+        current_count = _component_count(fused)
+        for stroke_label in range(1, int(stroke_count) + 1):
+            target = stroke_labels == stroke_label
+            if np.all(fused[target]):
+                continue
+            candidate = fused | target
+            candidate_count = _component_count(candidate)
+            if candidate_count >= current_count:
                 fused = candidate
                 current_count = candidate_count
     return fused

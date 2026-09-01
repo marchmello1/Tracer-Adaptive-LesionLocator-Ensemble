@@ -6,6 +6,8 @@ multi-click EDT fusion, topology-safe deletion of explicitly marked PSMA
 background strokes, and activation of six-point EDT corrections for moderately
 high-burden PSMA scans. Inference click coordinates are mapped into cropped
 model space by subtracting the crop origin exactly once before resampling.
+Exact foreground-scribble voxels are enforced without dilation when they do
+not bridge accepted lesion components.
 The upstream implementation validated all clicked
 donor components together, allowing a harmful lesion bridge to be offset by a
 separate newly created component, and disabled PSMA corrections above ten K0
@@ -37,7 +39,9 @@ tracer-specific K0 calibration and stateless EDT click correction.
   Tumor corrections are component-local and reject lesion bridges. Background
   deletion is disabled. PSMA correction requires at least six cumulative tumor
   points and at most 128 K0 components. Explicitly annotated PSMA background
-  voxels are removed only when doing so cannot split a component.
+  voxels are removed only when doing so cannot split a component. Exact tumor
+  scribble voxels are added one connected stroke at a time; strokes that would
+  merge accepted lesions are rejected.
 - Each invocation is stateless: K0 is reconstructed and all cumulative clicks
   are replayed.
 
@@ -104,8 +108,8 @@ python -m pytest -q tests
 ```
 
 The tests cover invalid inputs, PSMA component pruning, cumulative-click
-activation, topology-preserving foreground edits, and disabled background
-deletion.
+activation, topology-preserving donor fusion, exact supervised foreground
+strokes, and safe background erasure.
 
 ## Validation summary
 
@@ -117,6 +121,11 @@ used for interaction-policy selection; complete case-level AUC results and the
 unchanged comparator are reported in `VALIDATION.md`. The official preliminary
 evaluation identifier and recorded metric ranks are in
 `docs/PRELIMINARY_RESULTS.md`.
+
+The subsequent v3 foreground-stroke rule was evaluated causally on the same
+local trajectories. Relative to v2 it increased mean Dice AUC from `0.836582`
+to `0.841681` and mean F1 AUC from `0.921205` to `0.921580`, with no observed
+per-case regression. V3 has not been evaluated on the official test set.
 
 ## Provenance
 

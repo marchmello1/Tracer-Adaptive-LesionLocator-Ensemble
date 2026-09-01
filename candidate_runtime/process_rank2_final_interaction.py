@@ -206,6 +206,7 @@ def process() -> None:
                 # validation improved early Dice but changed later click
                 # polarity and regressed AUC on one case.
                 certified_background_points=tracer == "psma",
+                certified_tumor_points=True,
                 psma_max_components=int(
                     os.environ.get("AUTOPET_PSMA_INTERACTION_MAX_COMPONENTS", "128")
                 ),

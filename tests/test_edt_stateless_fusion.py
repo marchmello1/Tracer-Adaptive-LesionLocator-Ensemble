@@ -164,3 +164,31 @@ def test_certified_background_stroke_rejects_component_split():
     )
 
     np.testing.assert_array_equal(actual, initial)
+
+
+def test_certified_tumor_voxel_creates_disconnected_lesion():
+    initial = np.zeros((12, 12, 12), dtype=bool)
+    initial[1:3, 1:3, 1:3] = True
+    actual = fuse_clicked_components(
+        initial,
+        initial,
+        {"tumor": [[9, 9, 9]], "background": []},
+        "psma",
+        certified_tumor_points=True,
+    )
+    assert actual[9, 9, 9]
+
+
+def test_certified_tumor_stroke_cannot_bridge_lesions():
+    initial = np.zeros((12, 12, 12), dtype=bool)
+    initial[4, 4, 2] = True
+    initial[4, 4, 6] = True
+    bridge = [[4, 4, x] for x in range(3, 6)]
+    actual = fuse_clicked_components(
+        initial,
+        initial,
+        {"tumor": bridge, "background": []},
+        "fdg",
+        certified_tumor_points=True,
+    )
+    np.testing.assert_array_equal(actual, initial)

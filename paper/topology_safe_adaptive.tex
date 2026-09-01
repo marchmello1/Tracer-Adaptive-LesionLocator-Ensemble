@@ -21,9 +21,11 @@ donor components are validated
 independently to prevent a newly detected lesion from hiding a harmful bridge;
 PSMA foreground corrections are enabled up to a fixed 128-component burden;
 and explicitly annotated PSMA background voxels are removed only when removal
-cannot fragment a predicted component. Paired replay on local interactive
-fixtures showed no observed FDG regression and improved one PSMA trajectory
-from 0.8278 to 0.8343 AUC-Dice and from 0.9296 to 0.9502 AUC-DMM/F1. The method
+cannot fragment a predicted component. Exact foreground-scribble voxels are
+also enforced without dilation when they do not merge accepted lesions. Paired
+causal replay on local interactive fixtures increased mean AUC-Dice from
+0.8366 to 0.8417 and mean AUC-DMM/F1 from 0.9212 to 0.9216, without an observed
+per-case regression. The method
 is stateless, deterministic with respect to cumulative scribbles, and is
 released with complete upstream attribution.
 \keywords{autoPET V \and interactive segmentation \and PET/CT \and topology}
@@ -74,6 +76,10 @@ points and at most 128 initial components. Each connected background stroke is
 also handled independently: only its explicitly marked voxels are erased, and
 the erase is accepted only when it does not increase component count. FDG
 background behavior remains unchanged from the upstream system.
+Finally, each connected foreground scribble stroke is treated as direct
+supervision: its exact marked voxels are added without dilation if doing so
+does not reduce component count. This last operation is independent of network
+probability calibration.
 
 \subsection{Data postprocessing}
 FDG predictions use a probability threshold of 0.47 and burden-adaptive
@@ -94,14 +100,13 @@ released under a permissive license at
 github.com/Marchmello01/\allowbreak autopet-v-topology-safe-adaptive.
 
 \section{Results}
-On paired local replay, the topology gate was identical to upstream on ordinary
-trajectories. Safe background removal raised PSMA1 AUC-Dice from 0.8006 to
-0.8011 with unchanged F1. Relaxed, topology-checked correction raised PSMA2
-AUC-Dice from 0.8278 to 0.8343 and AUC-DMM/F1 from 0.9296 to 0.9502. PSMA4 was
-unchanged (0.8480 Dice, 0.8611 F1), and the conservative path was retained for
-the highly fragmented 178-component PSMA1 scan. These local fixtures support
-selection of the submitted policy but are not a substitute for hidden-test
-evaluation. The frozen container subsequently obtained preliminary-test Dice
+Relative to the frozen v2 policy, exact foreground-stroke enforcement raised
+mean causal AUC-Dice from 0.8366 to 0.8417 and mean AUC-DMM/F1 from 0.9212 to
+0.9216 over seven defined local cases. Dice improved in four cases and was
+unchanged in three; F1 improved in one and was unchanged in six. The largest
+Dice change was PSMA3 (0.7937 to 0.8238), while PSMA1 F1 changed from 0.8871 to
+0.8898. These local fixtures support selection of the policy but are not a
+substitute for hidden-test evaluation. The earlier frozen v2 container obtained preliminary-test Dice
 0.854649, F1/DMM 0.834179, and mean position 3.5. The preliminary set contains
 only five cases and is reported as an implementation check, not as a final-test
 performance claim.
@@ -111,8 +116,9 @@ The method changes interaction logic rather than claiming newly trained model
 weights. Its main advantage is a simple invariant: one useful new lesion may
 not compensate for a separate harmful bridge in the same update. The
 128-component ceiling is deliberately conservative and should be re-estimated
-on a larger independent validation set. This topology-safe derivative improved
-the targeted PSMA case without observed regression in the evaluated fixtures.
+on a larger independent validation set. Exact foreground-stroke enforcement
+reduces dependence on probability calibration, but the small validation cohort
+does not establish final-set performance.
 
 \begin{table}[ht]
 \caption{Algorithm details.}\label{tab1}
