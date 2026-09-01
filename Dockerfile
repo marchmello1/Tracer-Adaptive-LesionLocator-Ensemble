@@ -28,7 +28,7 @@ COPY --chown=algorithm:algorithm download_weights.py /opt/algorithm/download_wei
 USER root
 ARG CHAMPION_WEIGHTS_URL=https://zenodo.org/api/records/14007247/files/autoPET-3-LesionTracer.zip/content
 ARG CHAMPION_WEIGHTS_MD5=566016409b0bd14770c0b57c1f2873f1
-ARG EDT_WEIGHTS_URL
+ARG EDT_WEIGHTS_URL=https://github.com/marchmello1/Tracer-Adaptive-LesionLocator-Ensemble/releases/download/weights-v1.0.0/checkpoint_final.pth
 ARG EDT_WEIGHTS_SHA256=a0cb3a89c72b0a79a27900980361385ff02572c0c71aba6609390fecbbc13e82
 RUN set -eux; \
     python /opt/algorithm/download_weights.py "${CHAMPION_WEIGHTS_URL}" /tmp/champion.zip; \

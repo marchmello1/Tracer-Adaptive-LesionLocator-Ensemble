@@ -121,16 +121,22 @@ prompt normalization, K0 configuration, component filtering, cumulative-click
 activation, topology-preserving additions and removals, exact foreground
 strokes, idempotence, and release layout.
 
-For a full image with model downloads:
+For a full image, the Dockerfile downloads both public checkpoint artifacts and
+verifies their recorded digests:
 
 ```bash
 docker build --platform=linux/amd64 \
-  --build-arg EDT_WEIGHTS_URL=https://github.com/marchmello1/Tracer-Adaptive-LesionLocator-Ensemble/releases/download/weights-v1.0.0/checkpoint_final.pth \
   -t tracer-lesionlocator-ensemble:v1.0.0 .
 ```
 
 `Dockerfile.slim` is the no-download deployment path used when Grand Challenge
 mounts the separate model archive.
+
+The complete 4.58 GB Grand Challenge model archive is not duplicated in this
+repository. It contains the same five Zenodo-hosted LesionTracer folds and the
+GitHub-hosted EDT checkpoint listed above. The full Dockerfile reconstructs the
+self-contained image from those public, integrity-checked sources;
+`Dockerfile.slim` expects the equivalent archive at runtime.
 
 ## Reproduction record
 
@@ -138,7 +144,9 @@ The modular runtime was compared with the frozen submission image using the
 same container configuration, model mount, and inputs on an NVIDIA GPU. One
 FDG fixture and one PSMA fixture produced byte-identical segmentation files.
 Image digests, output hashes, commands, and scope limitations are recorded in
-[`docs/RUNTIME_REPRODUCTION.md`](docs/RUNTIME_REPRODUCTION.md).
+[`docs/RUNTIME_REPRODUCTION.md`](docs/RUNTIME_REPRODUCTION.md). A dependency
+map and both supported build paths are documented in
+[`REPRODUCIBILITY.md`](REPRODUCIBILITY.md).
 
 The preliminary evaluation created on 1 September 2026 reported:
 
