@@ -1,9 +1,15 @@
 AutoPET V Topology-Safe Adaptive Submission
 
+Copyright 2026 Mohammad Agwan, Nuvo AI
+
 This repository includes Apache-2.0 components from publicly released
 AutoPET lesion-segmentation and interactive-segmentation implementations.
 Their original license files and copyright notices are retained alongside
 the corresponding source trees.
+
+Except where an embedded upstream notice states otherwise, the
+submission-specific runtime, tests, documentation, and build recipes are
+licensed under the Apache License, Version 2.0.
 
 Submission-specific modifications include:
 - FDG probability calibration and burden-aware connected-component filtering;
