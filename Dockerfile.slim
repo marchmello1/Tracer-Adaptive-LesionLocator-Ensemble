@@ -1,0 +1,24 @@
+ARG RUNTIME_IMAGE=autopet-v-runtime:cuda12
+FROM ${RUNTIME_IMAGE}
+
+# The large, hash-pinned champion and EDT checkpoints are supplied through
+# Grand Challenge's separate model upload and resolved from /opt/ml/model.
+USER algorithm
+COPY --chown=algorithm:algorithm candidate_runtime /opt/algorithm/candidate_runtime
+COPY --chown=algorithm:algorithm edt_runner.py public_tracer_router.py tracer_router_ensemble_v1.npz /opt/algorithm/
+COPY --chown=algorithm:algorithm autoPET-interactive/nnunetv2 /opt/algorithm/edt_code/nnunetv2
+COPY --chown=algorithm:algorithm weights/edt_model /opt/algorithm/edt_model
+COPY --chown=algorithm:algorithm LICENSE NOTICE DERIVATION_NOTICE.md /opt/algorithm/upstream_notices/
+
+ENV AUTOPET_PUBLIC_CHAMPION=/opt/app/champion
+ENV AUTOPET_CHAMPION_MODEL=/opt/ml/model/champion_model
+ENV AUTOPET_PUBLIC_TRACER_MODE=robust
+ENV AUTOPET_FDG_RELAX_BURDEN_COMPONENTS=25
+ENV AUTOPET_FDG_PROBABILITY_THRESHOLD=0.47
+ENV AUTOPET_PSMA_PRUNE_THRESHOLD=0.86
+ENV AUTOPET_PSMA_INTERACTION_MAX_COMPONENTS=128
+ENV AUTOPET_EDT_CODE=/opt/algorithm/edt_code
+ENV AUTOPET_EDT_MODEL=/opt/ml/model/edt_model
+ENV AUTOPET_EDT_RUNNER=/opt/algorithm/edt_runner.py
+
+ENTRYPOINT ["python", "-m", "candidate_runtime.process_rank2_final_interaction"]

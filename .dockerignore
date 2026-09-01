@@ -1,0 +1,22 @@
+model/
+*.tar.gz
+*.tgz
+*.bin
+nnUNet_results/
+*.zip
+*.gif
+*.tiff
+*.nii.gz
+*.mha
+test/
+.git/
+__pycache__/
+**/__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Upstream documentation and placeholder model notes are kept in the public
+# source tree but are not runtime inputs. Excluding them makes the recursive
+# source provenance identical between clean and minimal build workspaces.
+autoPET-interactive/documentation/
+autoPET-interactive/_model/

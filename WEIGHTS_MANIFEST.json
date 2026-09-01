@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "grand_challenge_model_archive": {
+    "filename": "autopet-v-toposafe-adaptive-model-v1.tar.gz",
+    "sha256": "5f092f510a61e40f11ca22307f923b7baa1783c5ac9c985250fe325400c48103"
+  },
+  "lesiontracer": {
+    "source": "https://zenodo.org/records/14007247",
+    "folds": [0, 1, 2, 3, 4],
+    "archive_md5": "566016409b0bd14770c0b57c1f2873f1"
+  },
+  "lesionlocator_edt": {
+    "release_tag": "weights-v1.0.0",
+    "filename": "checkpoint_final.pth",
+    "fold": 0,
+    "sha256": "a0cb3a89c72b0a79a27900980361385ff02572c0c71aba6609390fecbbc13e82"
+  }
+}

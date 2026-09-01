@@ -1,0 +1,3 @@
+-r requirements.txt
+nibabel==5.4.2
+pytest>=8,<9

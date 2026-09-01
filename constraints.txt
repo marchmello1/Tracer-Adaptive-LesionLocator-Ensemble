@@ -1,0 +1,25 @@
+# Direct dependency lock for the frozen V5 production runtime.
+# The immutable PyTorch/CUDA stack is supplied by the digest-pinned base image.
+acvl-utils==0.2.6
+batchgenerators==0.25.3
+batchgeneratorsv2==0.3.3
+blosc2==4.5.1
+connected-components-3d==4.0.0
+dicom2nifti==2.6.2
+dynamic-network-architectures==0.3.1
+einops==0.8.2
+graphviz==0.21
+imagecodecs==2026.3.6
+matplotlib==3.11.0
+nibabel==5.4.2
+numpy==2.1.2
+pandas==3.0.3
+requests==2.32.3
+scikit-image==0.26.0
+scikit-learn==1.9.0
+seaborn==0.13.2
+SimpleITK==2.5.5
+scipy==1.17.1
+tifffile==2026.3.3
+tqdm==4.66.5
+yacs==0.1.8

@@ -1,0 +1,23 @@
+# Model weights are distributed through versioned release assets.
+model/
+*.tar.gz
+*.bin
+*.pth
+nnUNet_results/
+# Medical images, archives, and generated outputs.
+*.zip
+*.gif
+*.tiff
+*.nii.gz
+*.mha
+test/output/
+# Python caches.
+__pycache__/
+*.pyc
+**/__pycache__/
+.ipynb_checkpoints/
+
+# LaTeX build intermediates (the compiled manuscript PDF is tracked).
+*.aux
+*.log
+*.out

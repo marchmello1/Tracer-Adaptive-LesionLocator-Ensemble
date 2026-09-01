@@ -1,0 +1,168 @@
+\documentclass[runningheads]{llncs}
+\usepackage[T1]{fontenc}
+\usepackage{booktabs}
+\usepackage{array}
+\newcolumntype{P}[1]{>{\raggedright\arraybackslash}p{#1}}
+
+\begin{document}
+\title{Marchmello01: Topology-Safe Adaptive Lesion Fusion for Interactive PET/CT Segmentation}
+\author{Marchmello01}
+\authorrunning{Marchmello01}
+\institute{Independent researcher}
+\maketitle
+
+\begin{abstract}
+We describe an interactive whole-body tumor segmentation system for FDG and
+PSMA PET/CT. A five-fold nnU-Net residual-encoder ensemble produces the initial
+mask, followed by tracer-specific calibration and a prompt-conditioned
+distance-transform model. We introduce conservative interaction changes:
+clicks are mapped to cropped model space using one crop-origin subtraction;
+donor components are validated
+independently to prevent a newly detected lesion from hiding a harmful bridge;
+PSMA foreground corrections are enabled up to a fixed 128-component burden;
+and explicitly annotated PSMA background voxels are removed only when removal
+cannot fragment a predicted component. Paired replay on local interactive
+fixtures showed no observed FDG regression and improved one PSMA trajectory
+from 0.8278 to 0.8343 AUC-Dice and from 0.9296 to 0.9502 AUC-DMM/F1. The method
+is stateless, deterministic with respect to cumulative scribbles, and is
+released with complete upstream attribution.
+\keywords{autoPET V \and interactive segmentation \and PET/CT \and topology}
+\end{abstract}
+
+\section{Introduction}
+autoPET V evaluates lesion segmentation across FDG and PSMA PET/CT under
+iterative simulated and clinician-driven scribbles. High voxel overlap alone
+is insufficient: a useful method must also create missed lesion instances and
+remove false-positive instances without merging anatomically separate tumors.
+Our submission targets this topological failure mode while preserving strong
+initial segmentation from public AutoPET-III and AutoPET-IV components.
+
+\section{Methods}
+\subsection{Data}
+\subsubsection{Training data}
+The pretrained components use the public data and preprocessing described by
+the upstream AutoPET-III LesionTracer and AutoPET-IV LesionLocator releases.
+Our changes introduce no additional training data or weight optimization.
+
+\subsubsection{Validation data}
+Local validation used four FDG and four PSMA interactive fixtures, with
+cumulative challenge-format scribbles replayed for five steps. These fixtures
+were used for paired engineering comparisons and are not presented as an
+unbiased estimate of hidden-test rank.
+
+\subsection{Data preprocessing}
+CT and PET are resampled and normalized by the frozen nnU-Net plans. Predictions
+are returned to the CT reference grid, and the output copies its size, spacing,
+origin, and direction. Input-grid click coordinates are mapped into cropped
+model space by subtracting the crop origin once and then applying the
+crop-to-resampled scale. No metadata identifying the tracer is required.
+
+\subsection{Initial segmentation and tracer routing}
+Three frozen classifiers route each scan to FDG or PSMA. The initial mask is a
+five-fold AutoPET-III LesionTracer ResEncL ensemble without mirror test-time
+augmentation. FDG uses a probability threshold of 0.47 and burden-adaptive
+small-component filtering. PSMA uses threshold 0.50, five-voxel filtering,
+and the upstream frozen logistic component pruner at threshold 0.86.
+
+\subsection{Algorithm and topology-safe interaction}
+Later calls reconstruct the initial mask and run the fold-0 EDT LesionLocator
+with all cumulative scribbles. Each clicked foreground donor component is
+considered independently. It is accepted only if union with the current mask
+does not reduce the connected-component count, preventing lesion bridges.
+For PSMA, foreground correction requires at least six cumulative foreground
+points and at most 128 initial components. Each connected background stroke is
+also handled independently: only its explicitly marked voxels are erased, and
+the erase is accepted only when it does not increase component count. FDG
+background behavior remains unchanged from the upstream system.
+
+\subsection{Data postprocessing}
+FDG predictions use a probability threshold of 0.47 and burden-adaptive
+connected-component filtering. PSMA uses threshold 0.50, five-voxel filtering,
+and a frozen logistic component pruner with false-positive threshold 0.86.
+All interactive unions and erasures are checked using 18-connected components.
+
+\subsection{Training and test parameters}
+All network weights are unchanged pretrained weights. Consequently, no new
+optimizer, schedule, augmentation, or training hardware is applicable to this
+derivative. Inference uses five initial-model folds, one interactive fold,
+disabled mirror TTA, binary connected components, and cumulative stateless
+scribble replay. The submitted image targets an NVIDIA T4 with 16~GB VRAM.
+
+\subsection{GitHub repository}
+Code, tests, build recipes, notices, and checkpoint integrity hashes are
+released under a permissive license at
+github.com/Marchmello01/\allowbreak autopet-v-topology-safe-adaptive.
+
+\section{Results}
+On paired local replay, the topology gate was identical to upstream on ordinary
+trajectories. Safe background removal raised PSMA1 AUC-Dice from 0.8006 to
+0.8011 with unchanged F1. Relaxed, topology-checked correction raised PSMA2
+AUC-Dice from 0.8278 to 0.8343 and AUC-DMM/F1 from 0.9296 to 0.9502. PSMA4 was
+unchanged (0.8480 Dice, 0.8611 F1), and the conservative path was retained for
+the highly fragmented 178-component PSMA1 scan. These local fixtures support
+selection of the submitted policy but are not a substitute for hidden-test
+evaluation. The frozen container subsequently obtained preliminary-test Dice
+0.854649, F1/DMM 0.834179, and mean position 3.5. The preliminary set contains
+only five cases and is reported as an implementation check, not as a final-test
+performance claim.
+
+\section{Discussion and conclusion}
+The method changes interaction logic rather than claiming newly trained model
+weights. Its main advantage is a simple invariant: one useful new lesion may
+not compensate for a separate harmful bridge in the same update. The
+128-component ceiling is deliberately conservative and should be re-estimated
+on a larger independent validation set. This topology-safe derivative improved
+the targeted PSMA case without observed regression in the evaluated fixtures.
+
+\begin{table}[ht]
+\caption{Algorithm details.}\label{tab1}
+\small
+\begin{tabular}{P{0.18\textwidth}P{0.18\textwidth}P{0.18\textwidth}P{0.18\textwidth}P{0.18\textwidth}}
+\toprule
+Team & Algorithm & Preprocessing & Postprocessing & Augmentation \\
+\midrule
+Marchmello01 & Tracer Adaptive LesionLocator Ensemble & nnU-Net PET/CT normalization and resampling & Tracer calibration; topology-safe component fusion & Upstream pretrained models; no new training \\
+\bottomrule
+\end{tabular}
+
+\vspace{1em}
+\begin{tabular}{P{0.18\textwidth}P{0.18\textwidth}P{0.18\textwidth}P{0.18\textwidth}P{0.18\textwidth}}
+\toprule
+TTA & Ensembling & Framework & Architecture & Training loss \\
+\midrule
+None & Five-fold K0; one interactive fold; three-model tracer vote & nnU-Net v2 / PyTorch & 3-D residual-encoder U-Nets & Unchanged upstream Dice and cross-entropy objectives \\
+\bottomrule
+\end{tabular}
+
+\vspace{1em}
+\begin{tabular}{P{0.23\textwidth}P{0.23\textwidth}P{0.23\textwidth}P{0.23\textwidth}}
+\toprule
+Training data & Dimensionality & Pretrained models & Hardware \\
+\midrule
+Public AutoPET FDG/PSMA cohorts; no new training & 3-D whole-body PET/CT with sliding-window inference & Public AutoPET-III initializer and AutoPET-IV interaction model & NVIDIA T4 16~GB inference target \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{credits}
+\subsubsection{Acknowledgements}
+This work uses the public AutoPET-III LesionTracer and AutoPET-IV LesionLocator
+projects. We thank
+their authors and the autoPET organizers.
+\subsubsection{Disclosure of Interests}
+The author declares no competing interests.
+\end{credits}
+
+\begin{thebibliography}{3}
+\bibitem{nnunet}
+Isensee, F., Jaeger, P.F., Kohl, S.A.A., Petersen, J., Maier-Hein, K.H.:
+nnU-Net: a self-configuring method for deep learning-based biomedical image
+segmentation. Nature Methods \textbf{18}, 203--211 (2021)
+\bibitem{autopetsoftware}
+MIC-DKFZ: AutoPET-III LesionTracer and AutoPET-IV LesionLocator, Apache-2.0
+software releases (2024--2025)
+\bibitem{curriculum}
+Three-Phase Scribble-Adaptive Curriculum Learning for autoPETV Grand
+Challenge. arXiv:2608.22096 (2026)
+\end{thebibliography}
+\end{document}

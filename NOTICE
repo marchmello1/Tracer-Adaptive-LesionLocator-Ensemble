@@ -1,0 +1,18 @@
+AutoPET V Topology-Safe Adaptive Submission
+
+This repository includes Apache-2.0 components from publicly released
+AutoPET lesion-segmentation and interactive-segmentation implementations.
+Their original license files and copyright notices are retained alongside
+the corresponding source trees.
+
+Submission-specific modifications include:
+- FDG probability calibration and burden-aware connected-component filtering;
+- PSMA logistic false-positive component pruning;
+- stateless component-local EDT correction;
+- corrected crop-to-model click-coordinate mapping;
+- conservative no-background-deletion and topology safety gates;
+- Grand Challenge runtime composition and reproducible weight verification.
+
+The EDT checkpoint is redistributed as a GitHub Release asset under the terms
+of its upstream Apache-2.0 project. The AutoPET-III weights are fetched from
+their original Zenodo record and are not mirrored in this repository.

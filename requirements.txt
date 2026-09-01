@@ -1,0 +1,10 @@
+# Additional versions pinned by the validated AutoPET V container.
+# Most dependencies are resolved by the bundled autoPET-interactive fork.
+# Do not install the PyPI nnunetv2 package over that fork: it lacks the
+# AutoPET-specific predictor and EDT extensions used by this runtime.
+SimpleITK==2.5.5
+scipy==1.17.1
+numpy==2.1.2
+
+# Scribble morphology and connected-component postprocessing.
+connected-components-3d==4.0.0
