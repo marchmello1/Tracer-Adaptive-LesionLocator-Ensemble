@@ -47,8 +47,8 @@ tracer-specific K0 calibration and stateless EDT click correction.
 
 ## Runtime design
 
-The submission-specific interaction layer is organized as a small policy
-engine rather than a sequence of mask mutations:
+The submission-specific runtime is organized as four independently testable
+boundaries rather than one monolithic inference script:
 
 ```text
 PET/CT ──► tracer route ──► five-fold initial mask ──► tracer calibration
@@ -66,6 +66,14 @@ activation, and `TopologyLedger` is the only component allowed to mutate the
 accepted mask. Component pruning is isolated behind a frozen calibrated
 classifier. These boundaries make the safety invariants directly testable and
 keep model inference independent of interaction-policy changes.
+
+- `challenge_io.py` validates the Grand Challenge request and publishes output
+  with the reference geometry.
+- `initial_prediction.py` owns tracer-conditioned thresholds, dust filtering,
+  and PSMA component calibration.
+- `interactive_update.py` runs the click-conditioned donor and reconciles it
+  through a typed interaction policy.
+- `edt_stateless_fusion.py` implements the prompt, policy, and topology ledger.
 
 The Grand Challenge interface is:
 
@@ -146,7 +154,8 @@ python -m pip install -r requirements-test.txt
 python -m pytest -q tests
 ```
 
-The 27 tests cover invalid inputs, prompt normalization, PSMA component
+The 45 tests cover challenge I/O orchestration, invalid inputs, prompt
+normalization, initial-prediction configuration, donor geometry, PSMA component
 pruning, cumulative-click activation, topology-preserving donor fusion, exact
 supervised foreground strokes, safe background erasure, idempotence, and the
 addition/removal invariants of the topology ledger.

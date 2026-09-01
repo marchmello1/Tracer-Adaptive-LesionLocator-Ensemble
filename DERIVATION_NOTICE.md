@@ -9,6 +9,8 @@ Changes made for the marchmello1 topology-safe adaptive submission:
 - resolve the unchanged AutoPET-III and EDT weights from Grand Challenge's
   separately mounted `/opt/ml/model` directory;
 - add `Dockerfile.slim` to reuse an offline, validated CUDA/Python runtime;
+- separate challenge I/O, tracer-conditioned initial inference, interactive
+  donor execution, and topology reconciliation behind explicit typed policies;
 - validate every clicked EDT donor component independently before fusion,
   preventing a harmful lesion bridge from being hidden by another donor
   component that creates a new lesion in the same interaction;
