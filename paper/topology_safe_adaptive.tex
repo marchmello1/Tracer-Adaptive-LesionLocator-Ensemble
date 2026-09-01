@@ -24,7 +24,7 @@ and explicitly annotated PSMA background voxels are removed only when removal
 cannot fragment a predicted component. Exact foreground-scribble voxels are
 also enforced without dilation when they do not merge accepted lesions. Paired
 causal replay on local interactive fixtures increased mean AUC-Dice from
-0.8366 to 0.8417 and mean AUC-DMM/F1 from 0.9212 to 0.9216, without an observed
+0.8403 to 0.8443 and mean AUC-DMM/F1 from 0.9136 to 0.9139, without an observed
 per-case regression. The method
 is stateless, deterministic with respect to cumulative scribbles, and is
 released with complete upstream attribution.
@@ -47,7 +47,7 @@ the upstream AutoPET-III LesionTracer and AutoPET-IV LesionLocator releases.
 Our changes introduce no additional training data or weight optimization.
 
 \subsubsection{Validation data}
-Local validation used four FDG and four PSMA interactive fixtures, with
+Local validation used six FDG and four PSMA interactive fixtures, with
 cumulative challenge-format scribbles replayed for five steps. These fixtures
 were used for paired engineering comparisons and are not presented as an
 unbiased estimate of hidden-test rank.
@@ -101,9 +101,9 @@ github.com/Marchmello01/\allowbreak autopet-v-topology-safe-adaptive.
 
 \section{Results}
 Relative to the frozen v2 policy, exact foreground-stroke enforcement raised
-mean causal AUC-Dice from 0.8366 to 0.8417 and mean AUC-DMM/F1 from 0.9212 to
-0.9216 over seven defined local cases. Dice improved in four cases and was
-unchanged in three; F1 improved in one and was unchanged in six. The largest
+mean causal AUC-Dice from 0.8403 to 0.8443 and mean AUC-DMM/F1 from 0.9136 to
+0.9139 over nine defined local cases. Dice improved in five cases and was
+unchanged in four; F1 improved in one and was unchanged in eight. The largest
 Dice change was PSMA3 (0.7937 to 0.8238), while PSMA1 F1 changed from 0.8871 to
 0.8898. These local fixtures support selection of the policy but are not a
 substitute for hidden-test evaluation. The earlier frozen v2 container obtained preliminary-test Dice

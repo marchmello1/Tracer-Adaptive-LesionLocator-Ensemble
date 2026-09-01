@@ -123,9 +123,11 @@ evaluation identifier and recorded metric ranks are in
 `docs/PRELIMINARY_RESULTS.md`.
 
 The subsequent v3 foreground-stroke rule was evaluated causally on the same
-local trajectories. Relative to v2 it increased mean Dice AUC from `0.836582`
-to `0.841681` and mean F1 AUC from `0.921205` to `0.921580`, with no observed
-per-case regression. V3 has not been evaluated on the official test set.
+local trajectories. Relative to v2 it increased mean Dice AUC from `0.840250`
+to `0.844270` and mean F1 AUC from `0.913626` to `0.913917` over nine defined
+cases after two additional FDG fixtures were added. Five cases improved in
+Dice and four were unchanged; no per-case regression was observed. V3 has not
+been evaluated on the official test set.
 
 ## Provenance
 

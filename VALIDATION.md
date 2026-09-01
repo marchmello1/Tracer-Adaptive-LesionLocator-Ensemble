@@ -12,15 +12,17 @@ official score.
 | FDG 2 | 0.854681 | 0.854681 | 1.000000 | 1.000000 |
 | FDG 3 (negative) | n/a | n/a | n/a | n/a |
 | FDG 4 | 0.865234 | 0.865234 | 1.000000 | 1.000000 |
+| FDG 5 | 0.757311 | 0.757798 | 0.774194 | 0.774194 |
+| FDG 6 | 0.948866 | 0.948866 | 1.000000 | 1.000000 |
 | PSMA 1 | 0.801071 | 0.801398 | 0.887139 | 0.889764 |
 | PSMA 2 | 0.834320 | 0.836070 | 0.950188 | 0.950188 |
 | PSMA 3 | 0.793657 | 0.823770 | 1.000000 | 1.000000 |
 | PSMA 4 | 0.848048 | 0.851511 | 0.861111 | 0.861111 |
-| Mean over 7 defined cases | 0.836582 | 0.841681 | 0.921205 | 0.921580 |
+| Mean over 9 defined cases | 0.840250 | 0.844270 | 0.913626 | 0.913917 |
 
 Relative to the frozen preliminary v2 image, v3 changed the local mean by
-+0.005099 Dice AUC and +0.000375 F1 AUC. Four cases improved in Dice and three
-were unchanged; one case improved in F1 and six were unchanged. No defined case
++0.004020 Dice AUC and +0.000292 F1 AUC. Five cases improved in Dice and four
+were unchanged; one case improved in F1 and eight were unchanged. No defined case
 regressed. V3 adds only exact foreground-scribble voxels, without dilation, and
 rejects a connected scribble stroke if it would merge accepted lesions. These
 fixtures support a causal engineering comparison but remain too small to
