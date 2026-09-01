@@ -165,7 +165,9 @@ reviewed independently.
 
 ## Paper and citation
 
-The method-description source and compiled manuscript are in [`paper/`](paper/).
+The method-description source is in [`paper/`](paper/), with the compiled
+manuscript at
+[`Tracer-Adaptive-LesionLocator-Ensemble.pdf`](paper/Tracer-Adaptive-LesionLocator-Ensemble.pdf).
 The reviewed PDF and reproducible source package are published in the
 [`preprint-v1.0.0` release](https://github.com/marchmello1/Tracer-Adaptive-LesionLocator-Ensemble/releases/tag/preprint-v1.0.0).
 Citation metadata is available in [`CITATION.cff`](CITATION.cff).
