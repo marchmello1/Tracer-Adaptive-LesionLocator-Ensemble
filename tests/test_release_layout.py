@@ -14,6 +14,9 @@ def test_dockerfile_freezes_final_submission_parameters():
 
 def test_release_contains_required_runtime_and_weight_metadata():
     required = [
+        "candidate_runtime/challenge_io.py",
+        "candidate_runtime/initial_prediction.py",
+        "candidate_runtime/interactive_update.py",
         "candidate_runtime/process_rank2_final_interaction.py",
         "candidate_runtime/psma_champion_pruner.py",
         "candidate_runtime/edt_stateless_fusion.py",
