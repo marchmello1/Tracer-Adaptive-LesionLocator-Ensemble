@@ -87,6 +87,8 @@ class FusionPolicy:
     certified_background_points: bool
     certified_tumor_points: bool
     psma_max_components: int
+    consensus_background_deletion: bool
+    background_max_retained_fraction: float
 
     @classmethod
     def create(
@@ -97,16 +99,23 @@ class FusionPolicy:
         certified_background_points: bool,
         certified_tumor_points: bool,
         psma_max_components: int,
+        consensus_background_deletion: bool = False,
+        background_max_retained_fraction: float = 0.5,
     ):
         normalized = tracer.strip().lower()
         if normalized not in {"fdg", "psma"}:
             raise ValueError(f"Unsupported tracer: {normalized}")
+        retained_fraction = float(background_max_retained_fraction)
+        if not 0.0 <= retained_fraction <= 1.0:
+            raise ValueError("Background retained fraction must be between zero and one")
         return cls(
             tracer=normalized,
             disable_background_edits=disable_background_edits,
             certified_background_points=certified_background_points,
             certified_tumor_points=certified_tumor_points,
             psma_max_components=int(psma_max_components),
+            consensus_background_deletion=consensus_background_deletion,
+            background_max_retained_fraction=retained_fraction,
         )
 
     def propagate_tumor(self, prompts: PromptSet, component_count: int) -> bool:
@@ -181,6 +190,33 @@ def _apply_supervised_strokes(
             ledger.remove_if_nonfragmenting(stroke)
 
 
+def _apply_consensus_background_deletions(
+    ledger: TopologyLedger,
+    donor: np.ndarray,
+    prompts: PromptSet,
+    *,
+    max_retained_fraction: float,
+) -> None:
+    """Delete only components for which prompts and donor independently agree.
+
+    A negative prompt identifies the candidate object, while the interactive
+    donor supplies an independent retention vote. Any component containing a
+    foreground prompt is protected. Ambiguous objects fall through to the
+    conservative stroke-level correction.
+    """
+    component_map, _ = _labels(ledger.mask)
+    protected = set(_selected_labels(component_map, prompts.tumor))
+    candidates = _selected_labels(component_map, prompts.background)
+    for component_id in candidates:
+        if component_id in protected:
+            continue
+        component = component_map == component_id
+        retained = int(np.count_nonzero(donor & component))
+        retained_fraction = retained / int(np.count_nonzero(component))
+        if retained_fraction < max_retained_fraction:
+            ledger.remove_if_nonfragmenting(component)
+
+
 def fuse_clicked_components(
     initial: np.ndarray,
     edt_prediction: np.ndarray,
@@ -191,6 +227,8 @@ def fuse_clicked_components(
     certified_background_points: bool = False,
     certified_tumor_points: bool = False,
     psma_max_components: int = 128,
+    consensus_background_deletion: bool = False,
+    background_max_retained_fraction: float = 0.5,
 ) -> np.ndarray:
     """Return a stateless, topology-safe fusion for cumulative interaction."""
     accepted = _as_binary_grid(initial)
@@ -204,6 +242,8 @@ def fuse_clicked_components(
         certified_background_points=certified_background_points,
         certified_tumor_points=certified_tumor_points,
         psma_max_components=psma_max_components,
+        consensus_background_deletion=consensus_background_deletion,
+        background_max_retained_fraction=background_max_retained_fraction,
     )
     prompts = PromptSet.from_mapping(scribbles, accepted.shape)
     ledger = TopologyLedger(accepted)
@@ -217,6 +257,14 @@ def fuse_clicked_components(
         and not policy.disable_background_edits
     ):
         _replace_clicked_background_components(ledger, donor, prompts.background)
+
+    if policy.consensus_background_deletion and len(prompts.background) > 0:
+        _apply_consensus_background_deletions(
+            ledger,
+            donor,
+            prompts,
+            max_retained_fraction=policy.background_max_retained_fraction,
+        )
 
     if policy.certified_background_points:
         _apply_supervised_strokes(ledger, prompts.background, foreground=False)

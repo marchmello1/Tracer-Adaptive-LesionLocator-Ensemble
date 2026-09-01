@@ -207,6 +207,14 @@ def process() -> None:
                 # polarity and regressed AUC on one case.
                 certified_background_points=tracer == "psma",
                 certified_tumor_points=True,
+                consensus_background_deletion=(
+                    os.environ.get("AUTOPET_BACKGROUND_CONSENSUS", "0") == "1"
+                ),
+                background_max_retained_fraction=float(
+                    os.environ.get(
+                        "AUTOPET_BACKGROUND_MAX_RETAINED_FRACTION", "0.5"
+                    )
+                ),
                 psma_max_components=int(
                     os.environ.get("AUTOPET_PSMA_INTERACTION_MAX_COMPONENTS", "128")
                 ),
