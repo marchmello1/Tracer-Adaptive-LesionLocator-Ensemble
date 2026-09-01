@@ -98,7 +98,7 @@ read-only at `/opt/ml/model`.
 | Artifact | Distribution | Integrity |
 | --- | --- | --- |
 | LesionTracer folds 0–4 | [Zenodo record 14007247](https://zenodo.org/records/14007247) | MD5 `566016409b0bd14770c0b57c1f2873f1` |
-| LesionLocator EDT fold 0 | [Release `weights-v1.0.0`](https://github.com/marchmello1/Autopet-v-topology-safe-adaptive/releases/tag/weights-v1.0.0) | SHA-256 `a0cb3a89c72b0a79a27900980361385ff02572c0c71aba6609390fecbbc13e82` |
+| LesionLocator EDT fold 0 | [Release `weights-v1.0.0`](https://github.com/marchmello1/Tracer-Adaptive-LesionLocator-Ensemble/releases/tag/weights-v1.0.0) | SHA-256 `a0cb3a89c72b0a79a27900980361385ff02572c0c71aba6609390fecbbc13e82` |
 
 The 782 MiB EDT checkpoint is a release asset rather than a Git object. Verify
 it before building:
@@ -125,7 +125,7 @@ For a full image with model downloads:
 
 ```bash
 docker build --platform=linux/amd64 \
-  --build-arg EDT_WEIGHTS_URL=https://github.com/marchmello1/Autopet-v-topology-safe-adaptive/releases/download/weights-v1.0.0/checkpoint_final.pth \
+  --build-arg EDT_WEIGHTS_URL=https://github.com/marchmello1/Tracer-Adaptive-LesionLocator-Ensemble/releases/download/weights-v1.0.0/checkpoint_final.pth \
   -t tracer-lesionlocator-ensemble:v1.0.0 .
 ```
 
@@ -167,7 +167,7 @@ reviewed independently.
 
 The method-description source and compiled manuscript are in [`paper/`](paper/).
 The reviewed PDF and reproducible source package are published in the
-[`preprint-v1.0.0` release](https://github.com/marchmello1/Autopet-v-topology-safe-adaptive/releases/tag/preprint-v1.0.0).
+[`preprint-v1.0.0` release](https://github.com/marchmello1/Tracer-Adaptive-LesionLocator-Ensemble/releases/tag/preprint-v1.0.0).
 Citation metadata is available in [`CITATION.cff`](CITATION.cff).
 
 ## License
