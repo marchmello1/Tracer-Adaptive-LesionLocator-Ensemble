@@ -160,6 +160,10 @@ pruning, cumulative-click activation, topology-preserving donor fusion, exact
 supervised foreground strokes, safe background erasure, idempotence, and the
 addition/removal invariants of the topology ledger.
 
+The modular runtime also reproduced the frozen container byte-for-byte on one
+FDG and one PSMA GPU fixture. Exact output and image hashes are recorded in
+`docs/RUNTIME_REPRODUCTION.md`.
+
 ## Validation summary
 
 The frozen submission obtained Dice `0.854649`, lesion F1/DMM `0.834179`, and
