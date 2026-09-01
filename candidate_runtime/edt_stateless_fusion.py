@@ -1,32 +1,184 @@
-"""Pure stateless component fusion used by the deployable EDT candidate."""
+"""Topology-preserving fusion of automatic masks and interactive corrections.
+
+Prompt validation, evidence selection, and topology checks are deliberately
+separate so deployment and tests exercise one explicit interaction policy.
+"""
+
+from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 
 import cc3d
 import numpy as np
 
 
-def _valid_coordinates(
-    values: Sequence, shape: tuple[int, int, int]
-) -> np.ndarray:
-    result = []
-    for value in values:
-        if not isinstance(value, (list, tuple)) or len(value) != 3:
-            continue
-        try:
-            coordinate = [int(item) for item in value]
-        except (TypeError, ValueError):
-            continue
-        if all(0 <= coordinate[axis] < shape[axis] for axis in range(3)):
-            result.append(coordinate)
-    return np.asarray(result, dtype=np.int64).reshape(-1, 3)
+GridShape = tuple[int, int, int]
 
 
-def _component_count(mask: np.ndarray) -> int:
-    _, count = cc3d.connected_components(
+def _as_binary_grid(value: np.ndarray) -> np.ndarray:
+    grid = np.asarray(value, dtype=bool)
+    if grid.ndim != 3:
+        raise ValueError(f"Expected a 3-D mask, received shape {grid.shape}")
+    return grid
+
+
+def _labels(mask: np.ndarray) -> tuple[np.ndarray, int]:
+    labels, count = cc3d.connected_components(
         np.asarray(mask, dtype=np.uint8), connectivity=18, return_N=True
     )
-    return int(count)
+    return labels, int(count)
+
+
+def _parse_points(values: Sequence, shape: GridShape) -> np.ndarray:
+    accepted: list[list[int]] = []
+    for raw in values:
+        if not isinstance(raw, (list, tuple)) or len(raw) != 3:
+            continue
+        try:
+            point = [int(coordinate) for coordinate in raw]
+        except (TypeError, ValueError):
+            continue
+        if all(0 <= point[axis] < shape[axis] for axis in range(3)):
+            accepted.append(point)
+    return np.asarray(accepted, dtype=np.int64).reshape(-1, 3)
+
+
+def _point_index(points: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    return tuple(points[:, axis] for axis in range(3))
+
+
+def _selected_labels(label_map: np.ndarray, points: np.ndarray) -> list[int]:
+    if len(points) == 0:
+        return []
+    values = np.unique(label_map[_point_index(points)])
+    return sorted(int(value) for value in values if value > 0)
+
+
+def _stroke_masks(points: np.ndarray, shape: GridShape):
+    if len(points) == 0:
+        return
+    prompt_grid = np.zeros(shape, dtype=np.uint8)
+    prompt_grid[_point_index(points)] = 1
+    stroke_map, stroke_count = _labels(prompt_grid)
+    for stroke_id in range(1, stroke_count + 1):
+        yield stroke_map == stroke_id
+
+
+@dataclass(frozen=True)
+class PromptSet:
+    """Validated foreground and background coordinates on one image grid."""
+
+    tumor: np.ndarray
+    background: np.ndarray
+
+    @classmethod
+    def from_mapping(cls, source: Mapping[str, Sequence], shape: GridShape):
+        return cls(
+            tumor=_parse_points(source.get("tumor", []), shape),
+            background=_parse_points(source.get("background", []), shape),
+        )
+
+
+@dataclass(frozen=True)
+class FusionPolicy:
+    tracer: str
+    disable_background_edits: bool
+    certified_background_points: bool
+    certified_tumor_points: bool
+    psma_max_components: int
+
+    @classmethod
+    def create(
+        cls,
+        tracer: str,
+        *,
+        disable_background_edits: bool,
+        certified_background_points: bool,
+        certified_tumor_points: bool,
+        psma_max_components: int,
+    ):
+        normalized = tracer.strip().lower()
+        if normalized not in {"fdg", "psma"}:
+            raise ValueError(f"Unsupported tracer: {normalized}")
+        return cls(
+            tracer=normalized,
+            disable_background_edits=disable_background_edits,
+            certified_background_points=certified_background_points,
+            certified_tumor_points=certified_tumor_points,
+            psma_max_components=int(psma_max_components),
+        )
+
+    def propagate_tumor(self, prompts: PromptSet, component_count: int) -> bool:
+        if len(prompts.tumor) == 0:
+            return False
+        if self.tracer == "fdg":
+            return True
+        return len(prompts.tumor) >= 6 and component_count <= self.psma_max_components
+
+
+class TopologyLedger:
+    """Mutable mask whose additions and removals obey component-count guards."""
+
+    def __init__(self, mask: np.ndarray):
+        self.mask = mask.copy()
+        _, self.component_count = _labels(self.mask)
+
+    def add_if_nonmerging(self, addition: np.ndarray) -> bool:
+        candidate = self.mask | addition
+        _, candidate_count = _labels(candidate)
+        if candidate_count < self.component_count:
+            return False
+        self.mask = candidate
+        self.component_count = candidate_count
+        return True
+
+    def remove_if_nonfragmenting(self, removal: np.ndarray) -> bool:
+        candidate = self.mask.copy()
+        candidate[removal] = False
+        _, candidate_count = _labels(candidate)
+        if candidate_count > self.component_count:
+            return False
+        self.mask = candidate
+        self.component_count = candidate_count
+        return True
+
+
+def _propagate_clicked_tumor_components(
+    ledger: TopologyLedger, donor: np.ndarray, tumor_points: np.ndarray
+) -> None:
+    donor_labels, _ = _labels(donor)
+    for component_id in _selected_labels(donor_labels, tumor_points):
+        ledger.add_if_nonmerging(donor_labels == component_id)
+
+
+def _replace_clicked_background_components(
+    ledger: TopologyLedger, donor: np.ndarray, background_points: np.ndarray
+) -> None:
+    current_labels, _ = _labels(ledger.mask)
+    chosen = _selected_labels(current_labels, background_points)
+    if not chosen:
+        return
+    candidate = ledger.mask.copy()
+    for component_id in chosen:
+        region = current_labels == component_id
+        candidate[region] = donor[region]
+    _, candidate_count = _labels(candidate)
+    if candidate_count <= ledger.component_count:
+        ledger.mask = candidate
+        ledger.component_count = candidate_count
+
+
+def _apply_supervised_strokes(
+    ledger: TopologyLedger, points: np.ndarray, *, foreground: bool
+) -> None:
+    for stroke in _stroke_masks(points, ledger.mask.shape):
+        if foreground:
+            if np.all(ledger.mask[stroke]):
+                continue
+            ledger.add_if_nonmerging(stroke)
+        elif np.any(ledger.mask & stroke):
+            ledger.remove_if_nonfragmenting(stroke)
 
 
 def fuse_clicked_components(
@@ -40,108 +192,34 @@ def fuse_clicked_components(
     certified_tumor_points: bool = False,
     psma_max_components: int = 128,
 ) -> np.ndarray:
-    """Fuse cumulative clicks into k0 without relying on previous container state."""
-    initial = np.asarray(initial, dtype=bool)
-    donor = np.asarray(edt_prediction, dtype=bool)
-    if initial.shape != donor.shape:
-        raise ValueError(f"Initial/EDT grid mismatch: {initial.shape} != {donor.shape}")
-    tracer = tracer.strip().lower()
-    if tracer not in {"fdg", "psma"}:
-        raise ValueError(f"Unsupported tracer: {tracer}")
-    tumor = _valid_coordinates(scribbles.get("tumor", []), initial.shape)
-    background = _valid_coordinates(scribbles.get("background", []), initial.shape)
-    fused = initial.copy()
-    initial_count = _component_count(initial)
+    """Return a stateless, topology-safe fusion for cumulative interaction."""
+    accepted = _as_binary_grid(initial)
+    donor = _as_binary_grid(edt_prediction)
+    if accepted.shape != donor.shape:
+        raise ValueError(f"Initial/EDT grid mismatch: {accepted.shape} != {donor.shape}")
 
-    # The PSMA full gate showed that fewer than six cumulative foreground
-    # points represent tiny boundary corrections that are safer to propagate.
-    allow_tumor = len(tumor) > 0
-    if tracer == "psma":
-        # Per-component topology validation permits corrections beyond the
-        # former ten-component cutoff while retaining a conservative ceiling
-        # for extremely fragmented/noisy PSMA predictions.
-        allow_tumor = (
-            allow_tumor
-            and len(tumor) >= 6
-            and initial_count <= int(psma_max_components)
-        )
-    if allow_tumor:
-        donor_labels, _ = cc3d.connected_components(
-            donor.astype(np.uint8), connectivity=18, return_N=True
-        )
-        index = tuple(tumor[:, axis] for axis in range(3))
-        target_labels = set(
-            int(value) for value in np.unique(donor_labels[index]) if value > 0
-        )
-        # Validate each clicked donor component independently.  The original
-        # aggregate check could hide a harmful bridge (-1 component) behind a
-        # separate newly added lesion (+1 component), because only the net
-        # component count was compared with K0.
-        for target_label in sorted(target_labels):
-            candidate = fused | (donor_labels == target_label)
-            # Never bridge lesions that are separate in the accepted mask.
-            if _component_count(candidate) >= _component_count(fused):
-                fused = candidate
+    policy = FusionPolicy.create(
+        tracer,
+        disable_background_edits=disable_background_edits,
+        certified_background_points=certified_background_points,
+        certified_tumor_points=certified_tumor_points,
+        psma_max_components=psma_max_components,
+    )
+    prompts = PromptSet.from_mapping(scribbles, accepted.shape)
+    ledger = TopologyLedger(accepted)
 
-    # PSMA background edits are disabled by the zero-loss full validation.
-    if tracer == "fdg" and len(background) > 0 and not disable_background_edits:
-        labels, _ = cc3d.connected_components(
-            fused.astype(np.uint8), connectivity=18, return_N=True
-        )
-        index = tuple(background[:, axis] for axis in range(3))
-        target_labels = set(
-            int(value) for value in np.unique(labels[index]) if value > 0
-        )
-        candidate = fused.copy()
-        for target_label in target_labels:
-            target = labels == target_label
-            candidate[target] = donor[target]
-        # Reject fragmentation that would create lesion-level false positives.
-        if _component_count(candidate) <= _component_count(fused):
-            fused = candidate
+    if policy.propagate_tumor(prompts, ledger.component_count):
+        _propagate_clicked_tumor_components(ledger, donor, prompts.tumor)
 
-    if certified_background_points and len(background) > 0:
-        # A background scribble is direct supervision: every marked voxel is
-        # known to be outside the target. Remove one connected stroke at a
-        # time, but reject a stroke if its removal fragments a prediction.
-        # Processing strokes independently prevents an erased FP component
-        # (-1 CC) from hiding a harmful split elsewhere (+1 CC).
-        scribble_mask = np.zeros_like(fused, dtype=np.uint8)
-        index = tuple(background[:, axis] for axis in range(3))
-        scribble_mask[index] = 1
-        stroke_labels, stroke_count = cc3d.connected_components(
-            scribble_mask, connectivity=18, return_N=True
-        )
-        current_count = _component_count(fused)
-        for stroke_label in range(1, int(stroke_count) + 1):
-            target = stroke_labels == stroke_label
-            if not np.any(fused & target):
-                continue
-            candidate = fused.copy()
-            candidate[target] = False
-            candidate_count = _component_count(candidate)
-            if candidate_count <= current_count:
-                fused = candidate
-                current_count = candidate_count
+    if (
+        policy.tracer == "fdg"
+        and len(prompts.background) > 0
+        and not policy.disable_background_edits
+    ):
+        _replace_clicked_background_components(ledger, donor, prompts.background)
 
-    if certified_tumor_points and len(tumor) > 0:
-        # Foreground scribble voxels are direct supervision. Enforce only the
-        # marked voxels, one connected stroke at a time, and reject a stroke
-        # if it would bridge accepted lesion components.
-        scribble_mask = np.zeros_like(fused, dtype=np.uint8)
-        index = tuple(tumor[:, axis] for axis in range(3))
-        scribble_mask[index] = 1
-        stroke_labels, stroke_count = cc3d.connected_components(
-            scribble_mask, connectivity=18, return_N=True
-        )
-        current_count = _component_count(fused)
-        for stroke_label in range(1, int(stroke_count) + 1):
-            target = stroke_labels == stroke_label
-            if np.all(fused[target]):
-                continue
-            candidate = fused | target
-            candidate_count = _component_count(candidate)
-            if candidate_count >= current_count:
-                fused = candidate
-                current_count = candidate_count
-    return fused
+    if policy.certified_background_points:
+        _apply_supervised_strokes(ledger, prompts.background, foreground=False)
+    if policy.certified_tumor_points:
+        _apply_supervised_strokes(ledger, prompts.tumor, foreground=True)
+    return ledger.mask

@@ -45,6 +45,28 @@ tracer-specific K0 calibration and stateless EDT click correction.
 - Each invocation is stateless: K0 is reconstructed and all cumulative clicks
   are replayed.
 
+## Runtime design
+
+The submission-specific interaction layer is organized as a small policy
+engine rather than a sequence of mask mutations:
+
+```text
+PET/CT ──► tracer route ──► five-fold initial mask ──► tracer calibration
+                                                        │
+cumulative clicks ──► validated prompt set ──► EDT donor components
+                                                        │
+                                                        ▼
+                         topology ledger ──► accepted segmentation
+                         ├─ additions may not merge lesions
+                         └─ removals may not fragment lesions
+```
+
+`PromptSet` owns coordinate validation, `FusionPolicy` owns tracer-dependent
+activation, and `TopologyLedger` is the only component allowed to mutate the
+accepted mask. Component pruning is isolated behind a frozen calibrated
+classifier. These boundaries make the safety invariants directly testable and
+keep model inference independent of interaction-policy changes.
+
 The Grand Challenge interface is:
 
 ```text
@@ -124,9 +146,10 @@ python -m pip install -r requirements-test.txt
 python -m pytest -q tests
 ```
 
-The tests cover invalid inputs, PSMA component pruning, cumulative-click
-activation, topology-preserving donor fusion, exact supervised foreground
-strokes, and safe background erasure.
+The 27 tests cover invalid inputs, prompt normalization, PSMA component
+pruning, cumulative-click activation, topology-preserving donor fusion, exact
+supervised foreground strokes, safe background erasure, idempotence, and the
+addition/removal invariants of the topology ledger.
 
 ## Validation summary
 
