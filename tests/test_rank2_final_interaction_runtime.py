@@ -1,4 +1,4 @@
-from candidate_runtime.process_rank2_final_interaction import has_effective_scribbles
+from candidate_runtime.challenge_io import has_effective_scribbles
 
 
 def test_empty_clicks_keep_exact_rank2_k0() -> None:
