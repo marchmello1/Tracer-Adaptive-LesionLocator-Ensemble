@@ -113,7 +113,7 @@ substitute for hidden-test evaluation. The earlier frozen v2 container obtained 
 only five cases and is reported as an implementation check, not as a final-test
 performance claim.
 
-\section{Discussion and conclusion}
+\section{Discussion}
 The method changes interaction logic rather than claiming newly trained model
 weights. Its main advantage is a simple invariant: one useful new lesion may
 not compensate for a separate harmful bridge in the same update. The
@@ -121,6 +121,11 @@ not compensate for a separate harmful bridge in the same update. The
 on a larger independent validation set. Exact foreground-stroke enforcement
 reduces dependence on probability calibration, but the small validation cohort
 does not establish final-set performance.
+
+\section{Conclusion}
+Tracer-aware initialization and component-local reconciliation provide one
+stateless interactive pipeline for FDG and PSMA PET/CT. The topology ledger
+makes the intended correction constraints explicit and independently testable.
 
 \begin{table}[ht]
 \caption{Algorithm details.}\label{tab1}
@@ -134,12 +139,16 @@ Item & Configuration \\
 Team & Nuvo AI \\
 Algorithm & Tracer Adaptive LesionLocator Ensemble \\
 Input and preprocessing & 3-D whole-body PET/CT; nnU-Net normalization, resampling, and sliding-window inference \\
+Training data & Published AutoPET-III and AutoPET-IV training cohorts; no additional local training data \\
 Initial segmentation & Five-fold residual-encoder U-Net ensemble with a three-model tracer vote \\
 Interaction model & One prompt-conditioned EDT fold with cumulative stateless scribble replay \\
 Postprocessing & Tracer calibration, component filtering, and topology-safe component fusion \\
-Training and augmentation & Public pretrained models; no new training or augmentation \\
+Architecture and patch & 3-D residual-encoder U-Net; $192\times192\times192$ voxel patches; source batch size 2 \\
+Training and augmentation & Public pretrained models; no new optimization or augmentation in this submission \\
+Loss and optimizer & Inherited nnU-Net compound Dice/cross-entropy loss; no submission-specific optimizer or schedule \\
 Test-time augmentation & None \\
 Framework & nnU-Net v2 and PyTorch \\
+Pretrained models & Public LesionTracer five-fold ensemble and LesionLocator EDT fold 0 \\
 Development hardware & Up to six NVIDIA H100 80~GB HBM3 GPUs \\
 Inference hardware & NVIDIA T4, 16~GB VRAM \\
 \bottomrule
