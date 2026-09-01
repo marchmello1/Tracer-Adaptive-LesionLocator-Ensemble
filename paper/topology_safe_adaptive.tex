@@ -2,153 +2,334 @@
 \usepackage[T1]{fontenc}
 \usepackage{booktabs}
 \usepackage{array}
+\usepackage{amsmath}
 \newcolumntype{P}[1]{>{\raggedright\arraybackslash}p{#1}}
 
 \begin{document}
 \title{Tracer Adaptive LesionLocator Ensemble}
-\titlerunning{Topology-Safe Adaptive Lesion Fusion}
+\titlerunning{Tracer Adaptive LesionLocator Ensemble}
 \author{Mohammad Agwan}
 \authorrunning{M. Agwan}
 \institute{Nuvo AI\\mohammad.agwan@nuvo.ai}
 \maketitle
 
 \begin{abstract}
-We describe an interactive whole-body tumor segmentation system for FDG and
-PSMA PET/CT. A five-fold nnU-Net residual-encoder ensemble produces the initial
-mask, followed by tracer-specific calibration and a prompt-conditioned
-distance-transform model. We introduce conservative interaction changes:
-clicks are mapped to cropped model space using one crop-origin subtraction;
-donor components are validated
-independently to prevent a newly detected lesion from hiding a harmful bridge;
-PSMA foreground corrections are enabled up to a fixed 128-component burden;
-and explicitly annotated PSMA background voxels are removed only when removal
-cannot fragment a predicted component. Exact foreground-scribble voxels are
-also enforced without dilation when they do not merge accepted lesions. Paired
-causal replay on local interactive fixtures increased mean AUC-Dice from
-0.8403 to 0.8443 and mean AUC-DMM/F1 from 0.9136 to 0.9139, without an observed
-per-case regression. The method
-is stateless, deterministic with respect to cumulative scribbles, and is
-released with complete upstream attribution.
+Interactive whole-body PET/CT segmentation must preserve a strong automatic
+mask while translating sparse corrections into changes of the intended lesion
+instances. We present a stateless system for FDG and PSMA studies that combines
+a five-fold residual-encoder U-Net ensemble, tracer-specific calibration, and
+a prompt-conditioned distance-transform model. The central contribution is a
+component-wise topology ledger. Candidate additions are accepted only when
+they do not merge accepted lesions, and supervised removals are accepted only
+when they do not fragment them. Input-grid annotations are mapped to cropped
+model space with one explicit origin subtraction, and cumulative annotations
+are replayed from the same image-only prediction at every call. On nine defined
+local interaction trajectories, the final policy increased mean AUC-Dice from
+0.8403 to 0.8443 and mean AUC-DMM/F1 from 0.9136 to 0.9139, with no observed
+case-level regression. A five-case preliminary evaluation reported Dice
+0.8546, lesion F1 0.8342, and mean metric position 3.5. Container-level checks
+on one FDG and one PSMA fixture produced byte-identical outputs before and
+after runtime modularization. These limited experiments establish behavioral
+reproducibility, but do not determine generalization to the hidden final set.
 \keywords{autoPET V \and interactive segmentation \and PET/CT \and topology}
 \end{abstract}
 
 \section{Introduction}
-autoPET V evaluates lesion segmentation across FDG and PSMA PET/CT under
-iterative simulated and clinician-driven scribbles. High voxel overlap alone
-is insufficient: a useful method must also create missed lesion instances and
-remove false-positive instances without merging anatomically separate tumors.
-Our submission targets this topological failure mode while preserving strong
-initial segmentation from public AutoPET-III and AutoPET-IV components.
+
+Whole-body PET/CT combines metabolic and anatomical information, but lesion
+appearance and physiological uptake differ substantially between FDG and PSMA
+tracers. Automatic segmentation therefore faces both voxel-level uncertainty
+and an instance-level problem: a mask may obtain high overlap while missing a
+small lesion, retaining a physiological false positive, or joining separate
+tumors. Interactive evaluation adds a further requirement. A useful correction
+should modify the lesion indicated by a sparse annotation without destabilizing
+unrelated parts of the volume.
+
+AutoPET V evaluates this setting through cumulative simulated and
+clinician-driven annotations. Our starting point is the multitracer
+LesionTracer ensemble~\cite{rokuss2024multitracer} and the promptable
+LesionLocator model~\cite{rokuss2025interactive}, both based on nnU-Net
+v2~\cite{isensee2021nnunet}. Rather than retraining either network, we study the
+interface between their predictions. The research question is whether simple,
+explicit component invariants can make prompt fusion safer while retaining the
+accuracy of the image-only ensemble.
+
+The contributions are threefold. First, we define a stateless tracer-aware
+pipeline that reconstructs the initial mask and replays all cumulative
+annotations. Second, we introduce component-wise acceptance tests that prevent
+one useful proposal from concealing an unrelated merge or split. Third, we
+publish a modular runtime with unit, policy-equivalence, and container-level
+reproduction evidence. All thresholds and pretrained checkpoints are frozen
+for the submitted system.
 
 \section{Methods}
+
 \subsection{Data}
+
 \subsubsection{Training data}
-The pretrained components use the public data and preprocessing described by
-the upstream AutoPET-III LesionTracer and AutoPET-IV LesionLocator releases.
-Our changes introduce no additional training data or weight optimization.
+No model was trained for this submission. The image-only checkpoints were
+trained on the public AutoPET-III data by their publishers, following the
+multitracer training procedure in~\cite{rokuss2024multitracer}. The
+interactive checkpoint was trained on the public AutoPET-IV data with
+synthetic click generation as described in~\cite{rokuss2025interactive}.
+These collections derive from the public FDG and PSMA PET/CT resources
+described in~\cite{gatidis2022fdg,jeblick2024psma}. We introduce no additional
+training subjects, labels, or weight optimization.
 
 \subsubsection{Validation data}
-Local validation used six FDG and four PSMA interactive fixtures, with
-cumulative challenge-format scribbles replayed for five steps. These fixtures
-were used for paired engineering comparisons and are not presented as an
-unbiased estimate of hidden-test rank.
+Engineering validation used ten local challenge-format fixtures: six FDG and
+four PSMA studies, each replayed for up to five cumulative interaction steps.
+One FDG fixture had no defined Dice or lesion-F1 value because both the target
+and prediction were effectively negative for the evaluated quantity. We
+therefore report paired aggregate metrics over the remaining nine defined
+trajectories. These fixtures were repeatedly used during policy development
+and must not be interpreted as an independent estimate of hidden-test
+performance.
 
-\subsection{Data preprocessing}
-CT and PET are resampled and normalized by the frozen nnU-Net plans. Predictions
-are returned to the CT reference grid, and the output copies its size, spacing,
-origin, and direction. Input-grid click coordinates are mapped into cropped
-model space by subtracting the crop origin once and then applying the
-crop-to-resampled scale. No metadata identifying the tracer is required.
+\subsection{System overview}
 
-\subsection{Initial segmentation and tracer routing}
-Three frozen classifiers route each scan to FDG or PSMA. The initial mask is a
-five-fold AutoPET-III LesionTracer ResEncL ensemble without mirror test-time
-augmentation. FDG uses a probability threshold of 0.47 and burden-adaptive
-small-component filtering. PSMA uses threshold 0.50, five-voxel filtering,
-and the upstream frozen logistic component pruner at threshold 0.86.
+Let $I=(I_{CT},I_{PET})$ denote a co-registered volume and let
+$P_t=(P_t^+,P_t^-)$ contain all foreground and background annotation voxels
+available at interaction step $t$. The system computes
+\begin{equation}
+K_0 = C_{\tau}(E(I)), \qquad
+K_t = F(K_0,D(I,P_t),P_t;\pi_{\tau}),
+\end{equation}
+where $E$ is the five-fold image-only ensemble, $C_{\tau}$ is
+tracer-conditioned calibration, $D$ is the prompt-conditioned donor model,
+$F$ is component-wise reconciliation, and $\pi_{\tau}$ is the fixed FDG or
+PSMA interaction policy. Each call reconstructs $K_0$ and evaluates the full
+cumulative $P_t$; no mask from step $t-1$ is required. This makes identical
+requests deterministic with respect to saved inputs and checkpoints.
 
-\subsection{Algorithm and topology-safe interaction}
-Later calls reconstruct the initial mask and run the fold-0 EDT LesionLocator
-with all cumulative scribbles. Each clicked foreground donor component is
-considered independently. It is accepted only if union with the current mask
-does not reduce the connected-component count, preventing lesion bridges.
-For PSMA, foreground correction requires at least six cumulative foreground
-points and at most 128 initial components. Each connected background stroke is
-also handled independently: only its explicitly marked voxels are erased, and
-the erase is accepted only when it does not increase component count. FDG
-background behavior remains unchanged from the upstream system.
-Finally, each connected foreground scribble stroke is treated as direct
-supervision: its exact marked voxels are added without dilation if doing so
-does not reduce component count. This last operation is independent of network
-probability calibration.
+\subsection{Preprocessing and coordinate mapping}
 
-\subsection{Data postprocessing}
-FDG predictions use a probability threshold of 0.47 and burden-adaptive
-connected-component filtering. PSMA uses threshold 0.50, five-voxel filtering,
-and a frozen logistic component pruner with false-positive threshold 0.86.
-All interactive unions and erasures are checked using 18-connected components.
+CT and PET volumes are processed with the normalization, target spacing, and
+sliding-window configuration stored in the pinned nnU-Net plans. Predictions
+are returned to the CT reference grid and copy its size, spacing, origin, and
+direction. An annotation coordinate on the input grid is converted to cropped
+model space by subtracting the crop origin exactly once and then applying the
+crop-to-resampled scale. Coordinates with malformed dimensionality or outside
+the volume are rejected before model execution.
+
+\subsection{Tracer routing and initial segmentation}
+
+A frozen three-classifier vote assigns each study to the FDG or PSMA policy.
+The image-only mask is generated by five 3-D residual-encoder U-Net folds with
+mirror test-time augmentation disabled. FDG foreground probabilities are
+thresholded at 0.47. Components smaller than 25 voxels are removed, except
+when at least 25 robust components indicate high disease burden, in which case
+the dust threshold is relaxed to five voxels. PSMA uses threshold 0.50 and a
+five-voxel dust threshold. A frozen logistic component classifier then rejects
+PSMA candidates above a false-positive probability of 0.86. The classifier
+uses fixed component-level image and geometry features; it is not adapted on
+the evaluation fixtures.
+
+\subsection{Prompt-conditioned donor}
+
+When effective annotations are present, a fold-0 EDT LesionLocator model
+receives CT, PET, and all cumulative prompts and produces a binary donor mask
+$D_t$. Tumor propagation is active for every annotated FDG call. For PSMA it
+is activated after at least six cumulative foreground points and only when
+$K_0$ contains at most 128 connected components. This evidence threshold
+limits changes from very sparse prompts, while the component ceiling avoids
+applying the donor to extremely fragmented initial masks.
+
+\subsection{Topology ledger}
+
+All masks use 18-connectivity. Let $n(M)$ be the number of foreground
+connected components in mask $M$. The ledger starts from $M=K_0$ and is the
+only module permitted to mutate the accepted mask. For each donor component
+$A$ selected by a foreground annotation, addition is accepted iff
+\begin{equation}
+n(M\cup A) \ge n(M).
+\label{eq:add}
+\end{equation}
+Because proposals are evaluated one connected component at a time,
+Eq.~\ref{eq:add} rejects a proposal that bridges two accepted lesions instead
+of allowing a separate newly discovered component to compensate for that
+merge. On acceptance, $M\leftarrow M\cup A$ and the component count is
+recomputed.
+
+Foreground annotation strokes are also direct supervision. Each connected
+stroke is added without dilation and is subjected to the same non-merging
+test. Broad background component replacement is disabled in the submitted
+runtime. For PSMA, an explicitly annotated background stroke $R$ is removed
+only iff
+\begin{equation}
+n(M\setminus R) \le n(M),
+\label{eq:remove}
+\end{equation}
+which prevents a thin erasure from splitting one accepted lesion into several
+objects. FDG background strokes do not mutate the submitted mask. These rules
+preserve component-count direction, not full digital topology; this distinction
+is considered in the limitations.
+
+\subsection{Postprocessing and deployment}
+
+The reconciled binary mask is transposed back to the challenge array order,
+resampled to the reference geometry, and written as one tumor-lesion
+segmentation. The Grand Challenge container performs no network access during
+inference and reads the model archive from a read-only mount. The submitted
+image contains five initial folds, one interactive fold interface, the frozen
+tracer router, and the component-filter parameters described above.
 
 \subsection{Training and test parameters}
-All network weights are unchanged pretrained weights. Consequently, no new
-optimizer, schedule, augmentation, or training hardware is applicable to this
-derivative. Inference uses five initial-model folds, one interactive fold,
-disabled mirror TTA, binary connected components, and cumulative stateless
-scribble replay. Engineering and local validation used up to six NVIDIA H100
-80~GB HBM3 GPUs. The submitted image targets an NVIDIA T4 with 16~GB VRAM.
 
-\subsection{GitHub repository}
-Code, tests, build recipes, notices, and checkpoint integrity hashes are
-released under a permissive license at
-github.com/marchmello1/\allowbreak Tracer-Adaptive-LesionLocator-Ensemble.
+Both segmentation networks use the pinned 3-D full-resolution nnU-Net plans:
+$192\times192\times192$ voxel patches, source batch size two, and a
+residual-encoder U-Net architecture. The upstream trainers use compound soft
+Dice and cross-entropy supervision. No learning rate, optimizer, scheduler, or
+augmentation was introduced because weights were not updated. Inference uses
+five-fold ensembling for $K_0$, one EDT fold for interactive calls, and no
+mirror TTA. Engineering and validation used up to six NVIDIA H100 80~GB HBM3
+GPUs. Deployment targets an NVIDIA T4 with 16~GB VRAM; the highest sampled
+allocation in the two container fixtures was approximately 7.1~GB.
+
+\subsection{Implementation and availability}
+
+Challenge I/O, initial prediction, donor execution, and reconciliation are
+separate modules. Prompt validation and tracer policy are immutable data
+objects, while the topology ledger owns mask changes. The Apache-2.0 source,
+tests, build recipes, notices, checkpoint hashes, and preprint are available at
+\texttt{github.com/marchmello1/Tracer-Adaptive-LesionLocator-Ensemble}.
+
+\section{Experimental Setup}
+
+\subsection{Paired causal replay}
+
+The v2 policy and final v3 policy were compared on identical images and
+cumulative annotations. At each step the two policies started from the same
+$K_0$ and received the same donor output; thus the comparison isolates the
+exact foreground-stroke rule. Dice was computed as
+\begin{equation}
+\operatorname{Dice}(M,G)=\frac{2|M\cap G|}{|M|+|G|}.
+\end{equation}
+Lesion detection used the challenge DMM/F1 evaluator. We summarize each
+five-step trajectory by its causal area under the metric curve and then take
+the unweighted mean over the nine defined cases. No confidence interval is
+reported because the fixtures are a small, development-selected cohort.
+
+\subsection{Packaging reproduction}
+
+The modular policy was compared with the frozen policy in 1,000 randomized
+mask/prompt trials. We then ran the frozen and modular containers with
+identical model mounts, environment, and inputs on one FDG and one PSMA
+fixture. Finally, the runtime was embedded into a self-contained Docker image
+and rerun without a host code mount. Output files were compared by SHA-256,
+not merely by aggregate metrics. The repository contains 45 focused tests for
+I/O validation, policy activation, component filtering, topology guards,
+idempotence, and release layout.
 
 \section{Results}
-Relative to the frozen v2 policy, exact foreground-stroke enforcement raised
-mean causal AUC-Dice from 0.8403 to 0.8443 and mean AUC-DMM/F1 from 0.9136 to
-0.9139 over nine defined local cases. Dice improved in five cases and was
-unchanged in four; F1 improved in one and was unchanged in eight. The largest
-Dice change was PSMA3 (0.7937 to 0.8238), while PSMA1 F1 changed from 0.8871 to
-0.8898. These local fixtures support selection of the policy but are not a
-substitute for hidden-test evaluation. The earlier frozen v2 container obtained preliminary-test Dice
-0.854649, F1/DMM 0.834179, and mean position 3.5. The preliminary set contains
-only five cases and is reported as an implementation check, not as a final-test
-performance claim.
+
+\begin{table}[t]
+\caption{Paired local interaction results. Values are trajectory AUCs; the
+negative FDG fixture with undefined metrics is excluded.}
+\label{tab:local}
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lrrrr}
+\toprule
+Case & v2 Dice & v3 Dice & v2 F1 & v3 F1 \\
+\midrule
+FDG 1 & .8591 & .8591 & .7500 & .7500 \\
+FDG 2 & .8547 & .8547 & 1.0000 & 1.0000 \\
+FDG 4 & .8652 & .8652 & 1.0000 & 1.0000 \\
+FDG 5 & .7573 & .7578 & .7742 & .7742 \\
+FDG 6 & .9489 & .9489 & 1.0000 & 1.0000 \\
+PSMA 1 & .8011 & .8014 & .8871 & .8898 \\
+PSMA 2 & .8343 & .8361 & .9502 & .9502 \\
+PSMA 3 & .7937 & .8238 & 1.0000 & 1.0000 \\
+PSMA 4 & .8480 & .8515 & .8611 & .8611 \\
+\midrule
+Mean & .8403 & .8443 & .9136 & .9139 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:local} shows a mean change of +0.0040 Dice AUC and +0.0003
+F1 AUC. Dice improved in five cases and was unchanged in four. F1 improved in
+one case and was unchanged in eight; no defined trajectory regressed. The
+largest Dice change occurred for PSMA 3 (+0.0301), where exact foreground
+supervision restored voxels that the donor alone did not retain.
+
+The earlier frozen v2 image was evaluated on the five-case preliminary set and
+obtained Dice 0.854649, lesion F1/DMM 0.834179, and mean metric position 3.5.
+One negative case had undefined Dice and F1, so those means used four cases.
+The modular v3 image was not separately submitted to the preliminary set.
+
+All 1,000 randomized production-policy comparisons agreed. The FDG and PSMA
+container fixtures were byte-identical between the frozen and modular
+runtimes, and the self-contained PSMA rerun retained the same output hash.
+These results establish equivalence for the tested conditions, not a formal
+proof over all image geometries or GPU execution paths.
 
 \section{Discussion}
-The method changes interaction logic rather than claiming newly trained model
-weights. Its main advantage is a simple invariant: one useful new lesion may
-not compensate for a separate harmful bridge in the same update. The
-128-component ceiling is deliberately conservative and should be re-estimated
-on a larger independent validation set. Exact foreground-stroke enforcement
-reduces dependence on probability calibration, but the small validation cohort
-does not establish final-set performance.
+
+The results support a narrow conclusion: explicit component-level guards can
+improve correction behavior without changing network weights or degrading the
+observed development trajectories. The per-component evaluation is important.
+A batch union may preserve its total component count when one proposal creates
+a lesion while another joins two existing lesions; processing components
+individually prevents that cancellation. Exact foreground strokes provide a
+second, model-independent path for honoring supervision, while the
+non-merging guard limits their spatial effect.
+
+The tracer policies reflect different failure modes. FDG preserves a strong
+automatic mask and accepts prompt-selected donor components immediately. PSMA
+uses stricter evidence and a frozen false-positive filter because physiological
+uptake and high lesion burden create more ambiguous components. These choices
+are transparent and testable, although fixed thresholds may not transfer to a
+different scanner or cohort distribution.
+
+\section{Limitations}
+
+The validation cohort is small, repeatedly inspected, and unsuitable for
+estimating final-set rank. The preliminary set contains only five studies and
+is likewise an implementation check. The component-count inequalities do not
+preserve holes, handles, or anatomical identity; they are conservative
+surrogates for two observed instance errors. The six-point PSMA threshold,
+128-component ceiling, and probability thresholds were not estimated with an
+independent calibration cohort. Only one FDG and one PSMA fixture were used for
+container-level equivalence, and sampled memory is not a worst-case bound.
+Finally, frozen public checkpoints inherit the data composition, annotation
+quality, and subgroup biases of their original training sets. The system is a
+research prototype and is not intended for clinical decision-making.
 
 \section{Conclusion}
-Tracer-aware initialization and component-local reconciliation provide one
-stateless interactive pipeline for FDG and PSMA PET/CT. The topology ledger
-makes the intended correction constraints explicit and independently testable.
 
-\begin{table}[ht]
-\caption{Algorithm details.}\label{tab1}
+Tracer Adaptive LesionLocator Ensemble combines a multitracer image-only
+ensemble with prompt-conditioned proposals through a stateless topology
+ledger. Component-wise non-merging and non-fragmenting checks make interactive
+changes explicit, local, and reproducible. Local paired replay suggests a
+small improvement without observed regression, while container tests confirm
+behavioral equivalence after modularization. Larger independent evaluation is
+required to establish generalization and clinical utility.
+
+\begin{table}[t]
+\caption{Algorithm and reproducibility details.}
+\label{tab:details}
 \small
 \centering
-\setlength{\tabcolsep}{6pt}
+\setlength{\tabcolsep}{5pt}
 \begin{tabular}{P{0.27\textwidth}P{0.64\textwidth}}
 \toprule
 Item & Configuration \\
 \midrule
 Team & Nuvo AI \\
 Algorithm & Tracer Adaptive LesionLocator Ensemble \\
-Input and preprocessing & 3-D whole-body PET/CT; nnU-Net normalization, resampling, and sliding-window inference \\
-Training data & Published AutoPET-III and AutoPET-IV training cohorts; no additional local training data \\
-Initial segmentation & Five-fold residual-encoder U-Net ensemble with a three-model tracer vote \\
-Interaction model & One prompt-conditioned EDT fold with cumulative stateless scribble replay \\
-Postprocessing & Tracer calibration, component filtering, and topology-safe component fusion \\
-Architecture and patch & 3-D residual-encoder U-Net; $192\times192\times192$ voxel patches; source batch size 2 \\
-Training and augmentation & Public pretrained models; no new optimization or augmentation in this submission \\
-Loss and optimizer & Inherited nnU-Net compound Dice/cross-entropy loss; no submission-specific optimizer or schedule \\
-Test-time augmentation & None \\
-Framework & nnU-Net v2 and PyTorch \\
-Pretrained models & Public LesionTracer five-fold ensemble and LesionLocator EDT fold 0 \\
+Input & 3-D co-registered whole-body CT and FDG- or PSMA-PET \\
+Training data & Published AutoPET-III/IV cohorts; no additional local training data \\
+Preprocessing & Pinned nnU-Net normalization, resampling, and sliding-window inference \\
+Architecture & 3-D residual-encoder U-Net; $192^3$ patch; source batch size 2 \\
+Initial model & Five LesionTracer folds and a frozen three-model tracer vote \\
+Interaction model & One LesionLocator EDT fold with cumulative prompt replay \\
+Postprocessing & Tracer calibration, component filtering, and topology ledger \\
+Loss/optimizer & Upstream Dice+cross-entropy; no submission-specific optimization \\
+Augmentation/TTA & No new augmentation; mirror TTA disabled for submitted inference \\
+Framework & nnU-Net v2, PyTorch, SimpleITK, and cc3d \\
 Development hardware & Up to six NVIDIA H100 80~GB HBM3 GPUs \\
 Inference hardware & NVIDIA T4, 16~GB VRAM \\
 \bottomrule
@@ -158,19 +339,34 @@ Inference hardware & NVIDIA T4, 16~GB VRAM \\
 \begin{credits}
 \subsubsection{Acknowledgements}
 This work uses the public AutoPET-III LesionTracer and AutoPET-IV LesionLocator
-projects. We thank
-their authors and the autoPET organizers.
+projects. We thank their authors and the autoPET organizers.
 \subsubsection{Disclosure of Interests}
 The author declares no competing interests.
 \end{credits}
 
-\begin{thebibliography}{2}
-\bibitem{nnunet}
+\begin{thebibliography}{5}
+\bibitem{isensee2021nnunet}
 Isensee, F., Jaeger, P.F., Kohl, S.A.A., Petersen, J., Maier-Hein, K.H.:
 nnU-Net: a self-configuring method for deep learning-based biomedical image
 segmentation. Nature Methods \textbf{18}, 203--211 (2021)
-\bibitem{autopetsoftware}
-MIC-DKFZ: AutoPET-III LesionTracer and AutoPET-IV LesionLocator, Apache-2.0
-software releases (2024--2025)
+
+\bibitem{gatidis2022fdg}
+Gatidis, S., et al.: A whole-body FDG-PET/CT dataset with manually annotated
+tumor lesions. Scientific Data \textbf{9}, 601 (2022).
+\url{https://doi.org/10.1038/s41597-022-01718-3}
+
+\bibitem{jeblick2024psma}
+Jeblick, K., et al.: A whole-body PSMA-PET/CT dataset with manually annotated
+tumor lesions. The Cancer Imaging Archive (2024).
+\url{https://doi.org/10.7937/r7ep-3x37}
+
+\bibitem{rokuss2024multitracer}
+Rokuss, M., et al.: From FDG to PSMA: A Hitchhiker's Guide to Multitracer,
+Multicenter Lesion Segmentation in PET/CT Imaging. arXiv:2409.09478 (2024)
+
+\bibitem{rokuss2025interactive}
+Rokuss, M., Kirchhoff, Y., Isensee, F., Maier-Hein, K.H.: Towards Interactive
+Lesion Segmentation in Whole-Body PET/CT with Promptable Models.
+arXiv:2508.21680 (2025)
 \end{thebibliography}
 \end{document}
