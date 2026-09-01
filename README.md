@@ -93,7 +93,7 @@ the same hash-pinned checkpoints from the platform's separate model archive.
 
 ```bash
 docker build --platform=linux/amd64 \
-  --build-arg EDT_WEIGHTS_URL=https://github.com/marchmello1/Autopet-v-topology-safe-adaptive/releases/download/weights-v1.0.0/checkpoint_final.pth \
+  --build-arg EDT_WEIGHTS_URL=https://github.com/marchmello1/Tracer-LesionLocator-Ensemble/releases/download/weights-v1.0.0/checkpoint_final.pth \
   -t autopet-v-toposafe-adaptive:final .
 ```
 
