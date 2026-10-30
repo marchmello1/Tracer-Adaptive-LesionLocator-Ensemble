@@ -1,5 +1,7 @@
 # Tracer Adaptive LesionLocator Ensemble
 
+**🥇 1st place, Category 2, autoPET V challenge (MICCAI 2026).**
+
 An interactive PET/CT lesion-segmentation submission for AutoPET V. The
 runtime produces an image-only lesion mask and then replays the accumulated
 foreground and background annotations on every interaction step. It supports
